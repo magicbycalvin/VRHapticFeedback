@@ -129,7 +129,7 @@ void loop() {
   // Read the current sense value, in the future this will be filtered.
   input = analogRead(CS_ADC);
 
-  myPID.compute();
+  myPID.Compute();
   
   // Drive the motor in the correct direction
   if (output < 0) {
