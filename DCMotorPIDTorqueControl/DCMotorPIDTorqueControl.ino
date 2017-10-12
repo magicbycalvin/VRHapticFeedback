@@ -13,6 +13,8 @@
  * DEFINITIONS
  */
 
+#define DEBUG
+
 // Motor direction, 0 or 1
 #define MOTOR_DIR 0
 
@@ -130,17 +132,17 @@ void loop() {
   } else {
     myPID.SetMode(AUTOMATIC);
   }
-  
-  // Send the tick count if it has changed
-  if (changedTick) {
-    serialBuffer = encoderTicks;
-    Serial.write((char*) serialBuffer, BUFFER_LEN);
-    changedTick = 0;
-  }
 
   input = analogRead(CS_ADC);
-  lowPassFilter( &input, xv, yv );
 
+  // Filter at a consistent frequency
+  curTime = millis();
+  if (curTime - lastTime >= TS_ms) {
+    lowPassFilter( &input, xv, yv );
+    lastTime = curTime;
+  }
+
+  // Doesn't need to be in the above timing loop since the class handles timing
   myPID.Compute();
   
   // Drive the motor in the correct direction
@@ -150,6 +152,13 @@ void loop() {
   } else {
     analogWrite(PH_PIN, 0);
     analogWrite(PWM_PIN, output);
+  }
+
+  // Send the tick count if it has changed
+  if (changedTick) {
+    serialBuffer = encoderTicks;
+    Serial.write((char*) serialBuffer, BUFFER_LEN);
+    changedTick = 0;
   }
 
 }
