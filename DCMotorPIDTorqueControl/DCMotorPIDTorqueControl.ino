@@ -40,6 +40,13 @@
 // Sensing
 #define CS_ADC A0
 
+// Low Pass Butterworth Filter
+#define AX2 2.08056713549229E-3
+#define AX1 4.16113427098458E-3
+#define AX0 2.08056713549229E-3
+#define BY1 -1.86689227971171
+#define BY0 875.214548253684E-3
+
 // PID controller constants (determined through simulation)
 #define KP 5023.5276
 #define KI 666884.475
@@ -47,7 +54,8 @@
 
 // Motor driver
 #define PWM_MAX 255 // Maximum PWM value
-#define PWM_MIN 13 // Minimum PWM value, min voltage = (PWM_MIN/255)*Driving voltage
+#define PWM_MIN -255 // Minimum PWM value, min voltage = (PWM_MIN/255)*Driving voltage
+//#define PWM_MIN 13
 
 // Communication codes
 #define KILL_SWITCH 31337 // Stop powering the motor
@@ -68,6 +76,10 @@ int16_t serialBuffer;
 // Timing
 unsigned long curTime = 0;
 unsigned long lastTime = 0;
+
+// Filter
+double xv[3] = {0};
+double yv[2] = {0};
 
 // PID
 double setPoint, input, output;
@@ -102,7 +114,7 @@ void setup() {
   // PID Controller
   setPoint = KILL_SWITCH;
   myPID.SetSampleTime(TS_ms);
-  myPID.SetOutputLimits(-255, 255);
+  myPID.SetOutputLimits(PWM_MIN, PWM_MAX);
   myPID.SetMode(MANUAL);
 
 }
@@ -126,8 +138,8 @@ void loop() {
     changedTick = 0;
   }
 
-  // Read the current sense value, in the future this will be filtered.
   input = analogRead(CS_ADC);
+  lowPassFilter( &input, xv, yv );
 
   myPID.Compute();
   
@@ -187,3 +199,19 @@ void encoderInterruptB() {
   }
   changedTick = 1;
 }
+
+void lowPassFilter( double* data, double xv[3], double yv[3] ) {
+  xv[2] = xv[1];
+  xv[1] = xv[0];
+
+  xv[0] = *data;
+  //yv[2] = yv[1];
+  yv[1] = yv[0];
+
+  yv[0] = (AX2 * xv[0] + AX1 * xv[1] + AX0 * xv[2]
+             - BY1 * yv[0]
+             - BY0 * yv[1]);
+
+  *data = yv[0];
+}
+
