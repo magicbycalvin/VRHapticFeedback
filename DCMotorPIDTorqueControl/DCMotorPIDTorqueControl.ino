@@ -14,9 +14,16 @@
  */
 
 #define DEBUG
+#ifdef DEBUG
+  #define DBprint( x ) Serial.print( x )
+  #define DBprintln( x ) Serial.println( x )
+#else
+  #define DBprint( x )
+  #define DBprintln( x )
+#endif
 
 // Motor direction, 0 or 1
-#define MOTOR_DIR 0
+#define MOTOR_DIR 1
 
 // Mechanical specifications
 #define GEAR_RATIO 51.45 // 51.45:1 (geared down)
@@ -33,7 +40,7 @@
 #define PWM_PIN 11
 
 // Timing constants
-#define TS_ms 1 // Encoder sample period in ms
+#define TS_ms 50 // Encoder sample period in ms
 
 // Communication
 #define SERIAL_BAUD 115200
@@ -50,14 +57,14 @@
 #define BY0 875.214548253684E-3
 
 // PID controller constants (determined through simulation)
-#define KP 5023.5276
-#define KI 666884.475
-#define KD 2.5993
+#define KP 0.6//5023.5276
+#define KI 0.1//666884.475
+#define KD 0.01//2.5993
 
 // Motor driver
 #define PWM_MAX 255 // Maximum PWM value
-#define PWM_MIN -255 // Minimum PWM value, min voltage = (PWM_MIN/255)*Driving voltage
-//#define PWM_MIN 13
+//#define PWM_MIN -255 // Minimum PWM value, min voltage = (PWM_MIN/255)*Driving voltage
+#define PWM_MIN 13
 
 // Communication codes
 #define KILL_SWITCH 31337 // Stop powering the motor
@@ -123,43 +130,78 @@ void setup() {
 
 void loop() {
 
+  #ifdef DEBUG
+    while (Serial.available() > 0) {
+      setPoint = (double) Serial.parseInt();
+    }
+  #else
+    if (Serial.available() > 1) {
+      serialBuffer = Serial.read() << 8;
+      serialBuffer |= Serial.read();
+      // Clear the buffer
+      while (Serial.available() > 0) Serial.read();
+    }
+  #endif
+
   // Determine whether to drive the motor
   if (setPoint == KILL_SWITCH) {
     myPID.SetMode(MANUAL);
+    output = 0;
   } else if (setPoint == SYNC) {
     myPID.SetMode(MANUAL);
+    output = 0;
     encoderTicks = 0;
   } else {
     myPID.SetMode(AUTOMATIC);
+    if (setPoint < 0) {
+      setPoint = -setPoint;
+      digitalWrite(PH_PIN, 1);
+    } else {
+      digitalWrite(PH_PIN, 0);
+    }
   }
 
   input = analogRead(CS_ADC);
 
-  // Filter at a consistent frequency
+  // Filter and compute at a consistent frequency
   curTime = millis();
   if (curTime - lastTime >= TS_ms) {
     lowPassFilter( &input, xv, yv );
+    myPID.Compute();
     lastTime = curTime;
   }
 
-  // Doesn't need to be in the above timing loop since the class handles timing
-  myPID.Compute();
+  analogWrite(PWM_PIN, output);
+
+  //if (output < 0) input = -input;
   
-  // Drive the motor in the correct direction
+  /* Drive the motor in the correct direction
   if (output < 0) {
     analogWrite(PH_PIN, 1);
     analogWrite(PWM_PIN, -output);
   } else {
     analogWrite(PH_PIN, 0);
     analogWrite(PWM_PIN, output);
-  }
+  }*/
 
   // Send the tick count if it has changed
   if (changedTick) {
-    serialBuffer = encoderTicks;
-    Serial.write((char*) serialBuffer, BUFFER_LEN);
+    #ifdef DEBUG
+      //Serial.print(setPoint);
+      //Serial.print('\t');
+      Serial.print(input);
+      Serial.print('\t');
+      Serial.println(output);
+      //Serial.print('\t');
+      //Serial.println(encoderTicks);
+    #else
+      serialBuffer = encoderTicks;
+      Serial.write((char*) serialBuffer, BUFFER_LEN);
+    #endif
     changedTick = 0;
   }
+
+  //DBprint('\n');
 
 }
 
