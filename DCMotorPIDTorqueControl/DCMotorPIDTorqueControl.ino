@@ -40,7 +40,7 @@
 #define PWM_PIN 11
 
 // Timing constants
-#define TS_ms 50 // Encoder sample period in ms
+#define TS_ms 1 // Encoder sample period in ms
 
 // Communication
 #define SERIAL_BAUD 115200
@@ -57,18 +57,21 @@
 #define BY0 875.214548253684E-3
 
 // PID controller constants (determined through simulation)
-#define KP 0.6//5023.5276
-#define KI 0.1//666884.475
-#define KD 0.01//2.5993
+#define KP 25 // 5023.5276 // 20
+#define KI 50 // 666884.475 // 0
+#define KD 0 // 2.5993 // 0
 
 // Motor driver
 #define PWM_MAX 255 // Maximum PWM value
 //#define PWM_MIN -255 // Minimum PWM value, min voltage = (PWM_MIN/255)*Driving voltage
-#define PWM_MIN 13
+#define PWM_MIN 0
 
 // Communication codes
 #define KILL_SWITCH 31337 // Stop powering the motor
 #define SYNC 31338 // Reset the tick count
+
+// Number of analog readings to take for determining the current bias
+#define I_BIAS_SAMPLES 1000
 
 /*
  * VARIABLES
@@ -90,9 +93,13 @@ unsigned long lastTime = 0;
 double xv[3] = {0};
 double yv[2] = {0};
 
+// Removing input bias from current sense
+int currentSum = 0;
+double currentBias = 0;
+
 // PID
 double setPoint, input, output;
-PID myPID( &input, &output, &setPoint, KP, KI, KD, DIRECT );
+PID myPID( &input, &output, &setPoint, KP, KI, KD, P_ON_E, DIRECT );
 
 void setup() {
 
@@ -126,10 +133,17 @@ void setup() {
   myPID.SetOutputLimits(PWM_MIN, PWM_MAX);
   myPID.SetMode(MANUAL);
 
+  // Remove any bias present in the current reading
+  for (int i = 1; i < I_BIAS_SAMPLES; i++) {
+    currentSum += analogRead( CS_ADC );
+  }
+  currentBias = (double) currentSum / I_BIAS_SAMPLES;
+
 }
 
 void loop() {
 
+  // Read the input (either in DEBUG or normal mode)
   #ifdef DEBUG
     while (Serial.available() > 0) {
       setPoint = (double) Serial.parseInt();
@@ -138,6 +152,7 @@ void loop() {
     if (Serial.available() > 1) {
       serialBuffer = Serial.read() << 8;
       serialBuffer |= Serial.read();
+      setPoint = (double) serialBuffer;
       // Clear the buffer
       while (Serial.available() > 0) Serial.read();
     }
@@ -161,31 +176,15 @@ void loop() {
     }
   }
 
-  input = analogRead(CS_ADC);
-
   // Filter and compute at a consistent frequency
   curTime = millis();
   if (curTime - lastTime >= TS_ms) {
+    input = analogRead(CS_ADC) - currentBias;
     lowPassFilter( &input, xv, yv );
     myPID.Compute();
-    lastTime = curTime;
-  }
-
-  analogWrite(PWM_PIN, output);
-
-  //if (output < 0) input = -input;
-  
-  /* Drive the motor in the correct direction
-  if (output < 0) {
-    analogWrite(PH_PIN, 1);
-    analogWrite(PWM_PIN, -output);
-  } else {
-    analogWrite(PH_PIN, 0);
     analogWrite(PWM_PIN, output);
-  }*/
-
-  // Send the tick count if it has changed
-  if (changedTick) {
+    lastTime = curTime;
+    
     #ifdef DEBUG
       //Serial.print(setPoint);
       //Serial.print('\t');
@@ -194,14 +193,17 @@ void loop() {
       Serial.println(output);
       //Serial.print('\t');
       //Serial.println(encoderTicks);
-    #else
+    #endif
+  }
+
+  // Send the tick count if it has changed
+  if (changedTick) {
+    #ifndef DEBUG
       serialBuffer = encoderTicks;
       Serial.write((char*) serialBuffer, BUFFER_LEN);
     #endif
     changedTick = 0;
   }
-
-  //DBprint('\n');
 
 }
 
