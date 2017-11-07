@@ -13,7 +13,7 @@
  * DEFINITIONS
  */
 
-#define DEBUG
+//#define DEBUG
 #ifdef DEBUG
   #define DBprint( x ) Serial.print( x )
   #define DBprintln( x ) Serial.println( x )
