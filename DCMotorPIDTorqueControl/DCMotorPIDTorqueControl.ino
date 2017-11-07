@@ -79,7 +79,7 @@
 
 // Volatile variables for the ISR
 volatile int portState = 0;
-volatile long encoderTicks = 0;
+volatile int16_t encoderTicks = 0;
 volatile bool changedTick = 0;
 
 // Communication
