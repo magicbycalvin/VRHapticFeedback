@@ -13,7 +13,7 @@
  * DEFINITIONS
  */
 
-//#define DEBUG
+#define DEBUG
 #ifdef DEBUG
   #define DBprint( x ) Serial.print( x )
   #define DBprintln( x ) Serial.println( x )
@@ -40,7 +40,7 @@
 #define PWM_PIN 11
 
 // Timing constants
-#define TS_ms 1 // Encoder sample period in ms
+#define TS_ms 10 // Encoder sample period in ms
 
 // Communication
 #define SERIAL_BAUD 115200
@@ -50,16 +50,16 @@
 #define CS_ADC A0
 
 // Low Pass Butterworth Filter
-#define AX2 2.08056713549229E-3
-#define AX1 4.16113427098458E-3
-#define AX0 2.08056713549229E-3
-#define BY1 -1.86689227971171
-#define BY0 875.214548253684E-3
+#define AX2 20.0833655642113E-3 //2.08056713549229E-3
+#define AX1 40.1667311284225E-3 //4.16113427098458E-3
+#define AX0 20.0833655642113E-3 //2.08056713549229E-3
+#define BY1 -1.56101807580072 //-1.86689227971171
+#define BY0 641.351538057563E-3 //875.214548253684E-3
 
 // PID controller constants (determined through simulation)
-#define KP 25 // 5023.5276 // 20
-#define KI 50 // 666884.475 // 0
-#define KD 0 // 2.5993 // 0
+#define KP 25 // 25 // 5023.5276 // 20
+#define KI 10 // 50 // 666884.475 // 0
+#define KD 0.01 // 2.5993 // 0
 
 // Motor driver
 #define PWM_MAX 255 // Maximum PWM value
@@ -83,7 +83,9 @@ volatile int16_t encoderTicks = 0;
 volatile bool changedTick = 0;
 
 // Communication
-int16_t serialBuffer;
+int16_t encoderTicksBuffer;
+byte serialBuffer[2];
+int16_t serialReadBuffer;
 
 // Timing
 unsigned long curTime = 0;
@@ -150,9 +152,9 @@ void loop() {
     }
   #else
     if (Serial.available() > 1) {
-      serialBuffer = Serial.read() << 8;
-      serialBuffer |= Serial.read();
-      setPoint = (double) serialBuffer;
+      serialReadBuffer = Serial.read() << 8;
+      serialReadBuffer |= Serial.read();
+      setPoint = (double) serialReadBuffer;
       // Clear the buffer
       while (Serial.available() > 0) Serial.read();
     }
@@ -199,8 +201,10 @@ void loop() {
   // Send the tick count if it has changed
   if (changedTick) {
     #ifndef DEBUG
-      serialBuffer = encoderTicks;
-      Serial.write((char*) serialBuffer, BUFFER_LEN);
+      encoderTicksBuffer = encoderTicks;
+      serialBuffer[0] = (byte) ((encoderTicksBuffer >> 8) & 0xFF);
+      serialBuffer[1] = (byte) (encoderTicksBuffer & 0xFF);
+      Serial.write(serialBuffer, BUFFER_LEN);
     #endif
     changedTick = 0;
   }
