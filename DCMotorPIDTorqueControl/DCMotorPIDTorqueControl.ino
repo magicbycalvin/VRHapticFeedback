@@ -57,9 +57,9 @@
 #define BY0 641.351538057563E-3 //875.214548253684E-3
 
 // PID controller constants (determined through simulation)
-#define KP 25 // 25 // 5023.5276 // 20
-#define KI 10 // 50 // 666884.475 // 0
-#define KD 0.01 // 2.5993 // 0
+#define KP 10 // 25 // 25 // 5023.5276 // 20
+#define KI 5 // 10 // 50 // 666884.475 // 0
+#define KD 0 // 0.01 // 2.5993 // 0
 
 // Motor driver
 #define PWM_MAX 255 // Maximum PWM value
