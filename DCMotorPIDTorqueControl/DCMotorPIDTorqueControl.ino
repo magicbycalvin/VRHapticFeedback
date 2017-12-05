@@ -13,7 +13,7 @@
  * DEFINITIONS
  */
 
-#define DEBUG
+//#define DEBUG
 #ifdef DEBUG
   #define DBprint( x ) Serial.print( x )
   #define DBprintln( x ) Serial.println( x )
@@ -168,6 +168,7 @@ void loop() {
     myPID.SetMode(MANUAL);
     output = 0;
     encoderTicks = 0;
+    setPoint = 0;
   } else {
     myPID.SetMode(AUTOMATIC);
     if (setPoint < 0) {
