@@ -163,10 +163,10 @@ void loop() {
   // Determine whether to drive the motor
   if (setPoint == KILL_SWITCH) {
     myPID.SetMode(MANUAL);
-    output = 0;
+    //output = 0;
   } else if (setPoint == SYNC) {
     myPID.SetMode(MANUAL);
-    output = 0;
+    //output = 0;
     encoderTicks = 0;
     setPoint = 0;
   } else {
