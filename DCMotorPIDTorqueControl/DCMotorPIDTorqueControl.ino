@@ -50,16 +50,25 @@
 #define CS_ADC A0
 
 // Low Pass Butterworth Filter
+
 #define AX2 20.0833655642113E-3 //2.08056713549229E-3
 #define AX1 40.1667311284225E-3 //4.16113427098458E-3
 #define AX0 20.0833655642113E-3 //2.08056713549229E-3
 #define BY1 -1.56101807580072 //-1.86689227971171
 #define BY0 641.351538057563E-3 //875.214548253684E-3
+/*
+#define AX2 2.08056713549229E-3
+#define AX1 4.16113427098458E-3
+#define AX0 2.08056713549229E-3
+#define BY1 -1.86689227971171
+#define BY0 875.214548253684E-3
+*/
+
 
 // PID controller constants (determined through simulation)
-#define KP 10 // 25 // 25 // 5023.5276 // 20
-#define KI 5 // 10 // 50 // 666884.475 // 0
-#define KD 0 // 0.01 // 2.5993 // 0
+#define KP 255/1023 // 25 // 25 // 5023.5276 // 20
+#define KI 25 // 10 // 50 // 666884.475 // 0
+#define KD 0.01 // 0.01 // 2.5993 // 0
 
 // Motor driver
 #define PWM_MAX 255 // Maximum PWM value
@@ -86,6 +95,7 @@ volatile bool changedTick = 0;
 int16_t encoderTicksBuffer;
 byte serialBuffer[2];
 int16_t serialReadBuffer;
+double setPointBuffer;
 
 // Timing
 unsigned long curTime = 0;
@@ -101,7 +111,7 @@ double currentBias = 0;
 
 // PID
 double setPoint, input, output;
-PID myPID( &input, &output, &setPoint, KP, KI, KD, P_ON_E, DIRECT );
+PID myPID( &input, &output, &setPoint, KP, KI, KD, P_ON_M, DIRECT );
 
 void setup() {
 
@@ -148,33 +158,34 @@ void loop() {
   // Read the input (either in DEBUG or normal mode)
   #ifdef DEBUG
     while (Serial.available() > 0) {
-      setPoint = (double) Serial.parseInt();
+      setPointBuffer = (double) Serial.parseInt();
     }
   #else
     if (Serial.available() > 1) {
       serialReadBuffer = Serial.read() << 8;
       serialReadBuffer |= Serial.read();
-      setPoint = (double) serialReadBuffer;
+      setPointBuffer = (double) serialReadBuffer;
       // Clear the buffer
       while (Serial.available() > 0) Serial.read();
     }
   #endif
 
   // Determine whether to drive the motor
-  if (setPoint == KILL_SWITCH) {
+  if (setPointBuffer == KILL_SWITCH) {
     myPID.SetMode(MANUAL);
-    //output = 0;
-  } else if (setPoint == SYNC) {
+    output = 0;
+  } else if (setPointBuffer == SYNC) {
     myPID.SetMode(MANUAL);
-    //output = 0;
+    output = 0;
     encoderTicks = 0;
     setPoint = 0;
   } else {
     myPID.SetMode(AUTOMATIC);
-    if (setPoint < 0) {
-      setPoint = -setPoint;
+    if (setPointBuffer < 0) {
+      setPoint = -setPointBuffer;
       digitalWrite(PH_PIN, 1);
     } else {
+      setPoint = setPointBuffer;
       digitalWrite(PH_PIN, 0);
     }
   }
